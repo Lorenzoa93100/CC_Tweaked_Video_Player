@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VBC Server</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080c0e;
+      --bg2: #0d1418;
+      --bg3: #111c20;
+      --border: #1e3a42;
+      --accent: #00e5ff;
+      --accent2: #ff6b35;
+      --green: #39ff14;
+      --text: #a8ccd4;
+      --text-dim: #3d6472;
+      --danger: #ff2d55;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scanlines overlay */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Glow vignette */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
+      pointer-events: none;
+      z-index: 9998;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      background: var(--bg2);
+      position: relative;
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .logo {
+      font-family: 'Orbitron', monospace;
+      font-weight: 900;
+      font-size: 1.6rem;
+      color: var(--accent);
+      text-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+      letter-spacing: 4px;
+    }
+
+    .logo span {
+      color: var(--accent2);
+      text-shadow: 0 0 20px rgba(255, 107, 53, 0.5);
+    }
+
+    .tagline {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+      margin-left: auto;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    /* ---- Upload panel ---- */
+    .panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      position: relative;
+    }
+
+    .panel::before {
+      content: attr(data-title);
+      position: absolute;
+      top: -10px; left: 12px;
+      background: var(--bg2);
+      padding: 0 8px;
+      font-size: 0.65rem;
+      color: var(--accent);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--border);
+      padding: 3rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(0, 229, 255, 0.03);
+    }
+
+    .drop-zone:hover::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(0,229,255,0.05) 0%, transparent 60%);
+    }
+
+    .drop-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .drop-zone h3 {
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 0.8rem;
+      letter-spacing: 2px;
+      margin-bottom: 0.5rem;
+    }
+
+    .drop-zone p {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    input[type="file"] { display: none; }
+
+    .form-row {
+      margin-top: 1rem;
+    }
+
+    .form-row label {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 0.4rem;
+    }
+
+    .form-row input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.85rem;
+      padding: 0.6rem 0.8rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-row input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.8rem;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--accent);
+      transform: translateX(-100%);
+      transition: transform 0.3s;
+      z-index: -1;
+    }
+
+    .btn:hover { color: var(--bg); }
+    .btn:hover::before { transform: translateX(0); }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn:disabled::before { display: none; }
+
+    /* ---- Progress ---- */
+    .progress-wrap {
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .progress-wrap.visible { display: block; }
+
+    .progress-bar-bg {
+      height: 2px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      width: 0%;
+      transition: width 0.3s;
+      position: relative;
+    }
+
+    .progress-bar-fill::after {
+      content: '';
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 20px;
+      background: white;
+      filter: blur(4px);
+      opacity: 0.6;
+    }
+
+    .progress-text {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      margin-top: 0.4rem;
+      letter-spacing: 1px;
+    }
+
+    /* ---- Video list ---- */
+    .video-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .video-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      padding: 1rem 1.2rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 1rem;
+      transition: border-color 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .video-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--accent);
+      transform: scaleY(0);
+      transition: transform 0.2s;
+      transform-origin: bottom;
+    }
+
+    .video-card:hover { border-color: rgba(0, 229, 255, 0.3); }
+    .video-card:hover::before { transform: scaleY(1); }
+
+    .video-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+      letter-spacing: 1px;
+      margin-bottom: 0.4rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .video-meta {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .video-meta span { white-space: nowrap; }
+
+    .badge {
+      font-size: 0.6rem;
+      padding: 2px 8px;
+      border-radius: 0;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+
+    .badge-ready { border: 1px solid var(--green); color: var(--green); }
+    .badge-processing {
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      animation: blink 1s infinite;
+    }
+    .badge-pending { border: 1px solid var(--text-dim); color: var(--text-dim); }
+    .badge-error { border: 1px solid var(--danger); color: var(--danger); }
+
+    @keyframes blink {
+      50% { opacity: 0.4; }
+    }
+
+    .video-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      align-items: flex-end;
+    }
+
+    .id-badge {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .btn-sm {
+      font-size: 0.6rem;
+      padding: 0.3rem 0.6rem;
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      font-family: 'Share Tech Mono', monospace;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-sm:hover {
+      background: var(--danger);
+      color: var(--bg);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-dim);
+      border: 1px dashed var(--border);
+    }
+
+    .empty-state p { font-size: 0.75rem; letter-spacing: 2px; }
+
+    /* ---- Toast ---- */
+    #toast {
+      position: fixed;
+      bottom: 2rem; right: 2rem;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      padding: 0.8rem 1.2rem;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      z-index: 10000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+      max-width: 300px;
+    }
+
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    #toast.success { border-left: 3px solid var(--green); }
+    #toast.error { border-left: 3px solid var(--danger); }
+
+    /* ---- Command hint ---- */
+    .cmd-hint {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      padding: 0.5rem 0.8rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      margin-top: 0.5rem;
+      letter-spacing: 1px;
+    }
+
+    .cmd-hint .cmd { color: var(--accent2); }
+
+    @media (max-width: 768px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">VBC<span>://</span>SERVER</div>
+    <div class="tagline">Video Block Converter &mdash; ComputerCraft: Tweaked</div>
+  </div>
+  <div class="status-dot" title="Serveur en ligne"></div>
+</header>
+
+<main>
+  <!-- Upload Panel -->
+  <div>
+    <div class="panel" data-title="// UPLOAD">
+      <div class="drop-zone" id="dropZone">
+        <span class="drop-icon">▶</span>
+        <h3>DRAG &amp; DROP VIDEO</h3>
+        <p>.mp4 &nbsp;·&nbsp; .mkv &nbsp;·&nbsp; .avi &nbsp;·&nbsp; .mov &nbsp;·&nbsp; .webm<br>max 500 MB</p>
+        <input type="file" id="fileInput" accept=".mp4,.mkv,.avi,.mov,.webm">
+      </div>
+
+      <div class="form-row">
+        <label>Nom (optionnel)</label>
+        <input type="text" id="videoName" placeholder="ma_video">
+      </div>
+
+      <button class="btn" id="uploadBtn" disabled>[ UPLOAD + CONVERT ]</button>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text" id="progressText">En attente...</div>
+      </div>
+    </div>
+
+    <div class="cmd-hint" style="margin-top:1rem;">
+      <div style="margin-bottom:0.4rem; color: var(--text); letter-spacing:2px; font-size:0.6rem;">// COMMANDES CC</div>
+      <div><span class="cmd">vbc play</span> &lt;video_id&gt;</div>
+      <div><span class="cmd">vbc play</span> &lt;video_id&gt; no &nbsp;&nbsp;— sans audio</div>
+    </div>
+  </div>
+
+  <!-- Video list -->
+  <div>
+    <div class="panel" data-title="// VIDEOS" style="padding-bottom:0; border-bottom:none;">
+      <div style="height: 12px;"></div>
+    </div>
+    <div class="video-grid" id="videoGrid">
+      <div class="empty-state" id="emptyState">
+        <p>AUCUNE VIDÉO</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+  const videoGrid = document.getElementById('videoGrid');
+  const emptyState = document.getElementById('emptyState');
+  const videoNameInput = document.getElementById('videoName');
+
+  let selectedFile = null;
+  let pollingTimers = {};
+
+  // ---- Drag & drop ----
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) selectFile(f);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) selectFile(fileInput.files[0]);
+  });
+
+  function selectFile(f) {
+    selectedFile = f;
+    dropZone.querySelector('h3').textContent = f.name;
+    dropZone.querySelector('p').textContent = (f.size / 1024 / 1024).toFixed(1) + ' MB';
+    uploadBtn.disabled = false;
+  }
+
+  // ---- Upload ----
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    uploadBtn.disabled = true;
+    progressWrap.classList.add('visible');
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('name', videoNameInput.value || selectedFile.name);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload');
+
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) {
+        const pct = Math.round(e.loaded / e.total * 100);
+        progressFill.style.width = pct + '%';
+        progressText.textContent = `Upload : ${pct}%`;
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status === 200) {
+        const res = JSON.parse(xhr.responseText);
+        progressFill.style.width = '100%';
+        progressText.textContent = `Conversion en cours... ID: ${res.id}`;
+        toast(`Vidéo uploadée — ID: ${res.id}`, 'success');
+        pollStatus(res.id);
+        loadVideos();
+
+        // Reset form
+        setTimeout(() => {
+          selectedFile = null;
+          fileInput.value = '';
+          videoNameInput.value = '';
+          uploadBtn.disabled = true;
+          progressWrap.classList.remove('visible');
+          progressFill.style.width = '0%';
+          dropZone.querySelector('h3').textContent = 'DRAG & DROP VIDEO';
+          dropZone.querySelector('p').textContent = '.mp4 · .mkv · .avi · .mov · .webm\nmax 500 MB';
+        }, 3000);
+      } else {
+        toast('Erreur upload : ' + xhr.responseText, 'error');
+        uploadBtn.disabled = false;
+      }
+    });
+
+    xhr.send(formData);
+  });
+
+  // ---- Poll conversion status ----
+  function pollStatus(videoId) {
+    if (pollingTimers[videoId]) return;
+    pollingTimers[videoId] = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/videos/${videoId}/status`);
+        const data = await res.json();
+        if (data.status === 'ready') {
+          clearInterval(pollingTimers[videoId]);
+          delete pollingTimers[videoId];
+          toast(`✓ Vidéo ${videoId} prête !`, 'success');
+          loadVideos();
+        } else if (data.status === 'error') {
+          clearInterval(pollingTimers[videoId]);
+          delete pollingTimers[videoId];
+          toast(`Erreur conversion ${videoId} : ${data.error}`, 'error');
+          loadVideos();
+        } else {
+          loadVideos(); // refresh affichage status
+        }
+      } catch (e) {}
+    }, 2000);
+  }
+
+  // ---- Load videos ----
+  async function loadVideos() {
+    try {
+      const res = await fetch('/api/videos');
+      const videos = await res.json();
+
+      if (videos.length === 0) {
+        videoGrid.innerHTML = '';
+        videoGrid.appendChild(emptyState);
+        return;
+      }
+
+      // Repoll les vidéos en processing
+      videos.forEach(v => {
+        if (v.status === 'processing' || v.status === 'pending') {
+          pollStatus(v.id);
+        }
+      });
+
+      videoGrid.innerHTML = videos.map(v => `
+        <div class="video-card" id="card-${v.id}">
+          <div>
+            <div class="video-name">${v.name || v.id}</div>
+            <div class="video-meta">
+              <span>${v.width || '?'}×${v.height || '?'}</span>
+              <span>${v.fps || '?'} fps</span>
+              <span>${v.duration ? v.duration.toFixed(1) + 's' : '?'}</span>
+              <span>${v.frame_count ? v.frame_count + ' frames' : ''}</span>
+              <span>${v.has_audio ? '🔊 ' + (v.audio_chunks || '?') + ' chunks' : '🔇 no audio'}</span>
+              <span class="badge badge-${v.status || 'pending'}">${v.status || 'pending'}</span>
+            </div>
+          </div>
+          <div class="video-actions">
+            <div class="id-badge">${v.id}</div>
+            <button class="btn-sm" onclick="deleteVideo('${v.id}')">[ DEL ]</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      toast('Impossible de charger les vidéos', 'error');
+    }
+  }
+
+  // ---- Delete ----
+  async function deleteVideo(id) {
+    if (!confirm(`Supprimer la vidéo ${id} ?`)) return;
+    const res = await fetch(`/api/videos/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      toast(`Vidéo ${id} supprimée`, 'success');
+      loadVideos();
+    } else {
+      toast('Erreur suppression', 'error');
+    }
+  }
+
+  // ---- Toast ----
+  function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `show ${type}`;
+    setTimeout(() => { el.className = ''; }, 4000);
+  }
+
+  // Init
+  loadVideos();
+  setInterval(loadVideos, 10000); // refresh toutes les 10s
+</script>
+</body>
+</html>
