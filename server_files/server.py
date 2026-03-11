@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from api.routes import router
+from api.client_routes import router as client_router
 from core.config import settings
 from storage.manager import storage_manager
 
@@ -39,6 +40,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(client_router)
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
